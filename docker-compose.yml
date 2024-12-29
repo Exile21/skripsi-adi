@@ -30,3 +30,4 @@ networks:
 
 volumes:
   mysql_data:
+    external: true
