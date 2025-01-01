@@ -9,7 +9,6 @@ COPY . /app
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir pytz
 
 # Expose port 8080
 EXPOSE 8080

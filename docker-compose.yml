@@ -17,6 +17,8 @@ services:
       MYSQL_DATABASE: esp_data
       MYSQL_USER: user
       MYSQL_PASSWORD: password
+      TZ: Asia/Jakarta
+    command: ['mysqld', '--default-time-zone=+07:00']
     ports:
       - "3306:3306"
     volumes:
