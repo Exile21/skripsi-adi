@@ -12,13 +12,18 @@ db_config = {
     'password': 'password'
 }
 
+# Set timezone to Jakarta
+local_tz = pytz.timezone('Asia/Jakarta')
+
 def insert_data(galon, value):
     try:
         connection = mysql.connector.connect(**db_config)
         if connection.is_connected():
             cursor = connection.cursor()
-            query = "INSERT INTO galon_data (galon, value) VALUES (%s, %s)"
-            cursor.execute(query, (galon, value))
+            # Get current time in local timezone
+            local_time = datetime.now(local_tz)
+            query = "INSERT INTO galon_data (galon, value, timestamp) VALUES (%s, %s, %s)"
+            cursor.execute(query, (galon, value, local_time))
             connection.commit()
             cursor.close()
     except Error as e:
