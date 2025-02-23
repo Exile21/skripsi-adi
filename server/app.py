@@ -81,37 +81,47 @@ def compute_prediction(galon):
             connection.close()
 
     if not records:
-        return None  # No data available for this gallon.
+        return None  # No data available.
 
-    # Calculate cumulative consumption from the water usage records.
-    cumulative_consumption = sum(record['value'] for record in records)
-    first_time = records[0]['timestamp']
-    last_time = records[-1]['timestamp']
+    # Filter out records with negative values.
+    records_positive = [r for r in records if r['value'] > 0]
+    if not records_positive:
+        return None  # No valid positive data.
 
-    # Calculate elapsed time in hours between the first and last record.
+    # Determine first and last timestamps from positive records.
+    first_time = records_positive[0]['timestamp']
+    if len(records_positive) == 1:
+        last_time = datetime.now(local_tz)
+    else:
+        last_time = records_positive[-1]['timestamp']
+
+    # Calculate elapsed time in hours.
     time_diff_hours = (last_time - first_time).total_seconds() / 3600.0
     if time_diff_hours <= 0:
-        return None
+        time_diff_hours = 0.001  # Prevent division by zero
 
-    # Compute the consumption rate (volume per hour)
-    consumption_rate = cumulative_consumption / time_diff_hours
+    # Calculate cumulative consumption from positive records.
+    consumption = sum(record['value'] for record in records_positive)
+
+    # Compute consumption rate (volume per hour)
+    consumption_rate = consumption / time_diff_hours
     if consumption_rate <= 0:
         return None
 
-    if cumulative_consumption >= CAPACITY:
-        # The gallon is empty or has been replaced.
+    if consumption >= CAPACITY:
+        # The gallon is empty or replaced.
         predicted_empty_time = last_time
         remaining_volume = 0
         hours_to_empty = 0
     else:
-        remaining_volume = CAPACITY - cumulative_consumption
+        remaining_volume = CAPACITY - consumption
         hours_to_empty = remaining_volume / consumption_rate
         predicted_empty_time = last_time + timedelta(hours=hours_to_empty)
 
     prediction = {
         'galon': galon,
         'capacity': CAPACITY,
-        'cumulative_consumption': cumulative_consumption,
+        'cumulative_consumption': consumption,
         'consumption_rate_per_hour': consumption_rate,
         'remaining_volume': remaining_volume,
         'hours_to_empty': hours_to_empty,
@@ -247,6 +257,10 @@ def get_predictions():
     finally:
         if connection.is_connected():
             connection.close()
+
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({'status': 'success', 'message': 'Welcome to the Water Prediction API!'}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)

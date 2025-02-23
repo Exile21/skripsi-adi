@@ -8,6 +8,8 @@ services:
       - local-network
     depends_on:
       - mysql
+    volumes:
+      - ./server:/app
 
   mysql:
     image: mysql:8.0.31
@@ -20,7 +22,7 @@ services:
       TZ: Asia/Jakarta
     command: ['mysqld', '--default-time-zone=+07:00']
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - ./mysql_data:/var/lib/mysql
     networks:
