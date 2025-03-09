@@ -191,6 +191,14 @@ def update_prediction(galon):
         # Not enough data to compute a valid prediction.
         return
 
+    # Check if we have a "no data" scenario
+    if prediction.get('status') in ['No data available', 'No positive consumption data available']:
+        # Skip updating the database when we don't have real data
+        return
+
+    # Get the current time for the updated_at field
+    current_time = datetime.now(local_tz)
+    
     try:
         connection = mysql.connector.connect(**db_config)
         if connection.is_connected():
@@ -201,6 +209,9 @@ def update_prediction(galon):
             result = cursor.fetchone()
             record_exists = result[0] > 0
 
+            # Handle special case for predicted_empty_time
+            predicted_empty_time = prediction['predicted_empty_time']
+            
             if record_exists:
                 update_query = """
                     UPDATE galon_prediction
@@ -213,12 +224,12 @@ def update_prediction(galon):
                     WHERE galon = %s
                 """
                 cursor.execute(update_query, (
-                    prediction['predicted_empty_time'],
+                    predicted_empty_time,
                     prediction['consumption_rate_per_hour'],
                     prediction['cumulative_consumption'],
                     prediction['remaining_volume'],
                     prediction['hours_to_empty'],
-                    prediction['last_time'],
+                    current_time,  # Use current_time instead of last_time
                     galon
                 ))
             else:
@@ -229,17 +240,17 @@ def update_prediction(galon):
                 """
                 cursor.execute(insert_query, (
                     galon,
-                    prediction['predicted_empty_time'],
+                    predicted_empty_time,
                     prediction['consumption_rate_per_hour'],
                     prediction['cumulative_consumption'],
                     prediction['remaining_volume'],
                     prediction['hours_to_empty'],
-                    prediction['last_time']
+                    current_time  # Use current_time instead of last_time
                 ))
             connection.commit()
             cursor.close()
     except Error as e:
-        print("Error updating prediction record: ", e)
+        print(f"Error updating prediction record: {e}")
     finally:
         if connection.is_connected():
             connection.close()
@@ -281,10 +292,13 @@ def predict(galon):
     Endpoint to retrieve the current prediction for a specific water gallon.
     It computes (or retrieves) the prediction data and returns it as JSON.
     """
-    prediction = compute_prediction(galon)
-    if prediction is None:
-        return jsonify({'status': 'error', 'message': 'Not enough data for prediction or error occurred'}), 400
-    return jsonify({'status': 'success', 'prediction': prediction}), 200
+    try:
+        prediction = compute_prediction(galon)
+        if prediction is None:
+            return jsonify({'status': 'error', 'message': 'Error computing prediction'}), 400
+        return jsonify({'status': 'success', 'prediction': prediction}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/predictions', methods=['GET'])
 def get_predictions():
