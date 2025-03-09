@@ -81,15 +81,47 @@ def compute_prediction(galon):
             connection.close()
 
     if not records:
-        return None  # No data available.
+        # No data available - return a default prediction with no consumption
+        current_time = datetime.now(local_tz)
+        return {
+            'galon': galon,
+            'capacity': CAPACITY,
+            'cumulative_consumption': 0.0,
+            'consumption_rate_per_hour': 0.0,
+            'remaining_volume': CAPACITY,
+            'hours_to_empty': float('inf'),  # Infinite time to empty
+            'predicted_empty_time': 'N/A',   # Not applicable
+            'last_time': 'N/A',              # Not applicable
+            'current_time': current_time.strftime("%Y-%m-%d %H:%M:%S"),
+            'status': 'No data available'
+        }
 
     # Filter out records with negative values.
     records_positive = [r for r in records if r['value'] > 0]
     if not records_positive:
-        return None  # No valid positive data.
+        # No valid positive data - return a default prediction
+        current_time = datetime.now(local_tz)
+        return {
+            'galon': galon,
+            'capacity': CAPACITY,
+            'cumulative_consumption': 0.0,
+            'consumption_rate_per_hour': 0.0,
+            'remaining_volume': CAPACITY,
+            'hours_to_empty': float('inf'),  # Infinite time to empty
+            'predicted_empty_time': 'N/A',   # Not applicable
+            'last_time': 'N/A',              # Not applicable
+            'current_time': current_time.strftime("%Y-%m-%d %H:%M:%S"),
+            'status': 'No positive consumption data available'
+        }
         
     # Get the current time in the local timezone
     current_time = datetime.now(local_tz)
+    
+    # Make sure all timestamps are timezone aware
+    for record in records_positive:
+        # Add timezone information if it's naive
+        if record['timestamp'].tzinfo is None:
+            record['timestamp'] = local_tz.localize(record['timestamp'])
     
     # Use only recent data (last 48 hours) for more accurate recent consumption rate
     recent_cutoff = current_time - timedelta(hours=48)
@@ -144,7 +176,8 @@ def compute_prediction(galon):
         'hours_to_empty': hours_to_empty,
         'predicted_empty_time': predicted_empty_time.strftime("%Y-%m-%d %H:%M:%S"),
         'last_time': last_time.strftime("%Y-%m-%d %H:%M:%S"),
-        'current_time': current_time.strftime("%Y-%m-%d %H:%M:%S")
+        'current_time': current_time.strftime("%Y-%m-%d %H:%M:%S"),
+        'status': 'Success'
     }
     return prediction
 
